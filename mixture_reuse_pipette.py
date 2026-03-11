@@ -154,47 +154,39 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
     # Step 4: Close latch
     heater_shaker.close_labware_latch()
 
-    # ---- Step 5: Dispense liquids (1 tip per solution) ----
+    # ---- Step 5: Dispense liquids continuously by well block (1 tip per solution) ----
+    well_blocks = [
+        ("Wells 1-16 (R+Y binary)", 0, 16),
+        ("Wells 17-32 (R+B binary)", 16, 32),
+        ("Wells 33-48 (Y+B binary)", 32, 48),
+        ("Wells 49-96 (Random)", 48, 96),
+    ]
 
-    # 5A: Water
-    protocol.comment("Dispensing Water (1 tip for all wells)")
-    pipette.pick_up_tip()
-    for well, vol in zip(all_wells, water_vols):
-        if vol > 0:
-            pipette.aspirate(vol, reservoir_water["A1"])
-            pipette.dispense(vol, well.top(-5))
-            pipette.blow_out(well.top(-2))
-    pipette.drop_tip()
+    def dispense_liquid_across_blocks(liquid_name, source_well, volumes):
+        protocol.comment(f"Dispensing {liquid_name} continuously across well blocks (1 tip)")
+        pipette.pick_up_tip()
 
-    # 5B: Red
-    protocol.comment("Dispensing Red (1 tip for all wells)")
-    pipette.pick_up_tip()
-    for well, vol in zip(all_wells, red_vols):
-        if vol > 0:
-            pipette.aspirate(vol, reservoir_red["A1"])
-            pipette.dispense(vol, well.top(-5))
-            pipette.blow_out(well.top(-2))
-    pipette.drop_tip()
+        for block_name, start_idx, end_idx in well_blocks:
+            protocol.comment(f"{liquid_name}: {block_name}")
+            for well, vol in zip(all_wells[start_idx:end_idx], volumes[start_idx:end_idx]):
+                if vol <= 0:
+                    continue
 
-    # 5C: Yellow
-    protocol.comment("Dispensing Yellow (1 tip for all wells)")
-    pipette.pick_up_tip()
-    for well, vol in zip(all_wells, yellow_vols):
-        if vol > 0:
-            pipette.aspirate(vol, reservoir_yellow["A1"])
-            pipette.dispense(vol, well.top(-5))
-            pipette.blow_out(well.top(-2))
-    pipette.drop_tip()
+                # Keep the same tip and refill only when needed.
+                if pipette.current_volume < vol:
+                    refill_vol = pipette.max_volume - pipette.current_volume
+                    pipette.aspirate(refill_vol, source_well)
 
-    # 5D: Blue
-    protocol.comment("Dispensing Blue (1 tip for all wells)")
-    pipette.pick_up_tip()
-    for well, vol in zip(all_wells, blue_vols):
-        if vol > 0:
-            pipette.aspirate(vol, reservoir_blue["A1"])
-            pipette.dispense(vol, well.top(-5))
-            pipette.blow_out(well.top(-2))
-    pipette.drop_tip()
+                pipette.dispense(vol, well.top(-5))
+                pipette.blow_out(well.top(-2))
+
+        pipette.drop_tip()
+
+    # 5A-5D: Continuous dispensing by block, variable aliquot per well
+    dispense_liquid_across_blocks("Water", reservoir_water["A1"], water_vols)
+    dispense_liquid_across_blocks("Red", reservoir_red["A1"], red_vols)
+    dispense_liquid_across_blocks("Yellow", reservoir_yellow["A1"], yellow_vols)
+    dispense_liquid_across_blocks("Blue", reservoir_blue["A1"], blue_vols)
 
     protocol.comment("Total tips used: 4 (Water + Red + Yellow + Blue)")
     protocol.comment("Wells 1-16: R+Y binary | 17-32: R+B binary | 33-48: Y+B binary | 49-96: Random")
