@@ -1,3 +1,5 @@
+# Continuous Pipetting + Grass Green removed for 3-color baseline redo
+# Based on 03_11 Reuse pipette protocol with adjustments for 3 colors and updated labware layout
 from opentrons import protocol_api
 
 # ---------------------------------------------------------------------------

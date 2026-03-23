@@ -2,8 +2,8 @@ import numpy as np
 from opentrons import protocol_api
 
 metadata = {
-    "protocolName": "Sky Blue / Grass Green / Sunset Yellow Mixture Plate - Binary Pairs + Random",
-    "description": "48 binary pair wells (SB+GG, SB+SY, GG+SY) + 48 random mixture wells (SB,GG,SY,W). "
+    "protocolName": "Sky Blue / Pink / Sunset Yellow Mixture Plate - Binary Pairs + Random",
+    "description": "48 binary pair wells (SB+PK, SB+SY, PK+SY) + 48 random mixture wells (SB,PK,SY,W). "
                    "Total 96 wells, 200µL each, min 20µL per solution, integer volumes, seed=42.",
     "author": "June",
 }
@@ -39,7 +39,7 @@ def generate_volumes():
             wells.append(vol)
         return wells
 
-    # SB=0, GG=1, SY=2, W=3
+    # SB=0, PK=1, SY=2, W=3
     binary = make_binary_pair(0, 1) + make_binary_pair(0, 2) + make_binary_pair(1, 2)
 
     # ---- Random Mixtures (48 wells, Dirichlet) ----
@@ -113,11 +113,11 @@ def dispense_with_batching(protocol, pipette, source_well, all_wells, volumes, l
 
 def run(protocol: protocol_api.ProtocolContext) -> None:
     # ---- Generate volume arrays ----
-    all_volumes = generate_volumes()  # List of 96 × [SB, GG, SY, W]
+    all_volumes = generate_volumes()  # List of 96 × [SB, PK, SY, W]
 
     # Separate into per-solution arrays for dispensing
     sky_blue_vols      = [v[0] for v in all_volumes]
-    grass_green_vols   = [v[1] for v in all_volumes]
+    pink_vols          = [v[1] for v in all_volumes]
     sunset_yellow_vols = [v[2] for v in all_volumes]
     water_vols         = [v[3] for v in all_volumes]
 
@@ -144,7 +144,7 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
         "nest_1_reservoir_195ml", location="A1",
         namespace="opentrons", version=3,
     )
-    reservoir_grass_green = protocol.load_labware(
+    reservoir_pink = protocol.load_labware(
         "nest_1_reservoir_195ml", location="B1",
         namespace="opentrons", version=3,
     )
@@ -178,12 +178,12 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
 
     # ---- Define Liquids ----
     liquid_sky_blue      = protocol.define_liquid("Sky Blue",      display_color="#1E90FF")
-    liquid_grass_green   = protocol.define_liquid("Grass Green",   display_color="#228B22")
+    liquid_pink          = protocol.define_liquid("Pink",          display_color="#FF69B4")
     liquid_sunset_yellow = protocol.define_liquid("Sunset Yellow", display_color="#FFC200")
     liquid_water         = protocol.define_liquid("Water",         display_color="#87CEEB")
 
     reservoir_sky_blue["A1"].load_liquid(liquid_sky_blue,           volume=195000)
-    reservoir_grass_green["A1"].load_liquid(liquid_grass_green,     volume=195000)
+    reservoir_pink["A1"].load_liquid(liquid_pink,                   volume=195000)
     reservoir_sunset_yellow["A1"].load_liquid(liquid_sunset_yellow, volume=195000)
     reservoir_water["A1"].load_liquid(liquid_water,                 volume=195000)
 
@@ -218,15 +218,15 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
                            all_wells, sky_blue_vols, "Sky Blue")
 
     # 5C: Grass Green
-    dispense_with_batching(protocol, pipette, reservoir_grass_green["A1"],
-                           all_wells, grass_green_vols, "Grass Green")
+    dispense_with_batching(protocol, pipette, reservoir_pink["A1"],
+                           all_wells, pink_vols, "Pink")
 
     # 5D: Sunset Yellow
     dispense_with_batching(protocol, pipette, reservoir_sunset_yellow["A1"],
                            all_wells, sunset_yellow_vols, "Sunset Yellow")
 
-    protocol.comment("Total tips used: 4 (Water + Sky Blue + Grass Green + Sunset Yellow)")
-    protocol.comment("Wells 1-16: SB+GG binary | 17-32: SB+SY binary | 33-48: GG+SY binary | 49-96: Random")
+    protocol.comment("Total tips used: 4 (Water + Sky Blue + Pink + Sunset Yellow)")
+    protocol.comment("Wells 1-16: SB+PK binary | 17-32: SB+SY binary | 33-48: PK+SY binary | 49-96: Random")
 
     # Step 6: Open latch for lid
     heater_shaker.deactivate_heater()
