@@ -6,7 +6,7 @@ metadata = {
         "Dispense two columns in column-major order using contiguous-run refill logic. "
         "Each column gets volumes 10,10,10,10,20,80,50,20 uL."
     ),
-    "author": "June + Codex",
+    "author": "Fei + Codex",
 }
 
 requirements = {"robotType": "Flex", "apiLevel": "2.26"}
@@ -116,7 +116,12 @@ def dispense_liquid_across_blocks(
                 if vol <= 0:
                     continue
                 pipette.dispense(vol, all_wells[idx].top(-5))
-                pipette.blow_out(all_wells[idx].top(-2))
+                # Do not blow out after each dispense; that would empty the tip
+                # and break the remaining dispenses in this contiguous run.
+
+            # If any residual remains due to rounding/precision, clear once per run.
+            if pipette.current_volume > 0:
+                pipette.blow_out(source_well.top())
 
             block_cursor = run_end
 
@@ -128,6 +133,8 @@ def dispense_liquid_across_blocks(
 
 def run(protocol: protocol_api.ProtocolContext) -> None:
     # Labware
+    protocol.load_trash_bin("A3")
+
     tip_rack = protocol.load_labware(
         "opentrons_flex_96_tiprack_200ul",
         location="A2",
@@ -145,6 +152,9 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
         location="D2",
         namespace="opentrons",
         version=3,
+        lid="opentrons_tough_universal_lid",
+        lid_namespace="opentrons",
+        lid_version=1,
     )
 
     # Instrument
@@ -165,6 +175,9 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
         (f"Column {col + 1}", col * PLATE_ROWS, (col + 1) * PLATE_ROWS)
         for col in range(NUM_COLUMNS_TO_PIPETTE)
     ]
+
+    # Step: Remove lid from destination plate before pipetting.
+    protocol.move_lid(plate, "C3", use_gripper=True)
 
     dispense_liquid_across_blocks(
         protocol=protocol,
